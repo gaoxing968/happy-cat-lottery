@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>彩票模拟开奖器 2.0</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#302b63">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "微软雅黑", sans-serif;
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  min-height: 100vh;
+  color: #eaf6ff;
+}
+.page { max-width: 480px; margin: 0 auto; padding: 16px 12px; }
+.header { text-align: center; padding: 20px 0 12px; }
+.header h1 {
+  font-size: 22px; font-weight: bold;
+  background: linear-gradient(90deg, #f39c12, #e74c3c, #9b59b6);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.header p { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+.panel {
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 18px 16px; margin-bottom: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.panel-title { font-size: 13px; color: #7f8c8d; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; color: #bdc3c7; margin-bottom: 6px; }
+.field input[type="text"], .field input[type="date"], .field input[type="number"] {
+  width: 100%; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08); color: #fff;
+  font-size: 16px; font-family: inherit; outline: none;
+  transition: border-color 0.2s;
+}
+.field input:focus { border-color: #3498db; }
+.field input::placeholder { color: #56677a; }
+.mood-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.mood-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06); cursor: pointer;
+  transition: all 0.2s; font-size: 11px; color: #8899aa;
+}
+.mood-btn .emoji { font-size: 24px; }
+.mood-btn .label { font-size: 10px; }
+.mood-btn.active { background: rgba(52,152,219,0.3); border-color: #3498db; color: #eaf6ff; }
+.blood-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.blood-btn {
+  padding: 10px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06); color: #bdc3c7;
+  font-size: 14px; text-align: center; cursor: pointer;
+  transition: all 0.2s; font-weight: bold;
+}
+.blood-btn.active { background: rgba(231,76,60,0.3); border-color: #e74c3c; color: #fff; }
+.type-toggle { display: flex; background: rgba(255,255,255,0.06); border-radius: 12px; padding: 4px; gap: 4px; }
+.type-btn {
+  flex: 1; padding: 10px; border-radius: 10px; border: none;
+  background: transparent; color: #7f8c8d; font-size: 14px;
+  cursor: pointer; transition: all 0.2s; font-family: inherit; font-weight: bold;
+}
+.type-btn.active { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+.btn-primary {
+  width: 100%; padding: 14px; border-radius: 14px; border: none;
+  font-size: 16px; font-weight: bold; font-family: inherit;
+  cursor: pointer; margin-bottom: 10px; transition: transform 0.1s, opacity 0.2s;
+}
+.btn-primary:active { transform: scale(0.98); }
+.btn-confirm { background: linear-gradient(135deg, #3498db, #2980b9); color: #fff; }
+.btn-draw { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.result-box {
+  background: rgba(255,255,255,0.05); border-radius: 14px;
+  padding: 16px; margin-bottom: 12px;
+  border: 1px solid rgba(255,255,255,0.08); display: none;
+}
+.result-box.show { display: block; }
+.result-label { font-size: 12px; color: #7f8c8d; margin-bottom: 10px; }
+.numbers-display { text-align: center; font-size: 20px; font-weight: bold; color: #f39c12; line-height: 1.8; }
+.ball, .draw-ball {
+  display: inline-block; padding: 5px 10px; border-radius: 6px; margin: 3px;
+}
+.red-ball { background: #e74c3c; color: #fff; font-size: 18px; }
+.blue-ball { background: #2980b9; color: #fff; font-size: 18px; }
+.ball-group { margin: 6px 0; }
+.draw-result { text-align: center; margin-top: 14px; }
+.section-title { font-size: 12px; color: #7f8c8d; margin-bottom: 8px; }
+.win-result {
+  font-size: 18px; font-weight: bold; padding: 12px;
+  border-radius: 12px; margin-top: 10px;
+}
+.win-1 { background: linear-gradient(135deg, #f1c40f, #e67e22); color: #fff; }
+.win-2 { background: linear-gradient(135deg, #e67e22, #d35400); color: #fff; }
+.win-3 { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: #fff; }
+.win-4, .win-5 { background: linear-gradient(135deg, #27ae60, #2ecc71); color: #fff; }
+.win-6, .win-7, .win-8 { background: rgba(52,152,219,0.3); color: #eaf6ff; }
+.win-0 { background: rgba(255,255,255,0.05); color: #7f8c8d; }
+.hint { font-size: 11px; color: #56677a; text-align: center; margin-top: 10px; }
+.zodiac-tag {
+  display: inline-block; background: rgba(155,89,182,0.3);
+  border: 1px solid rgba(155,89,182,0.5); padding: 2px 10px;
+  border-radius: 20px; font-size: 12px; color: #d7bde2; margin-left: 8px;
+}
+.install-banner {
+  background: linear-gradient(135deg, #9b59b6, #8e44ad);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+  font-size: 13px; text-align: center; display: none;
+}
+.install-banner button {
+  background: #fff; color: #9b59b6; border: none;
+  padding: 6px 16px; border-radius: 20px; font-size: 13px;
+  font-weight: bold; cursor: pointer; margin-left: 10px;
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>🎰 开心猫彩票模拟器</h1>
+    <p>基于天文学 · 每日星座幸运号 · 纯属娱乐</p>
+  </div>
+
+  <div id="install-banner" class="install-banner">
+    收藏到桌面，体验 App 般的感觉
+    <button onclick="installApp()">立即安装</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">✏️ 今日幸运信息</div>
+
+    <div class="field">
+      <label>👤 名字（用于生成幸运号）</label>
+      <input type="text" id="name" placeholder="随便填，例如：小明" maxlength="20">
+    </div>
+
+    <div class="field">
+      <label>📅 生日 <span id="zodiac-tag" class="zodiac-tag">射手座</span></label>
+      <input type="date" id="birth" value="1993-12-13" max="2026-12-31">
+    </div>
+
+    <div class="field">
+      <label>😐 心情</label>
+      <div class="mood-grid">
+        <div class="mood-btn" onclick="selectMood(this)" data-mood="超开心"><span class="emoji">😄</span><span class="label">超开心</span></div>
+        <div class="mood-btn" onclick="selectMood(this)" data-mood="开心"><span class="emoji">😊</span><span class="label">开心</span></div>
+        <div class="mood-btn" onclick="selectMood(this)" data-mood="在思考"><span class="emoji">🤔</span><span class="label">在思考</span></div>
+        <div class="mood-btn" onclick="selectMood(this)" data-mood="有点down"><span class="emoji">😔</span><span class="label">有点down</span></div>
+        <div class="mood-btn" onclick="selectMood(this)" data-mood="很气愤"><span class="emoji">😤</span><span class="label">很气愤</span></div>
+        <div class="mood-btn" onclick="selectMood(this)" data-mood="压力大"><span class="emoji">😰</span><span class="label">压力大</span></div>
+        <div class="mood-btn active" onclick="selectMood(this)" data-mood="平常心"><span class="emoji">😐</span><span class="label">平常心</span></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>🎂 心情年龄 <span style="font-size:11px;color:#56677a">（感觉今年像…）</span></label>
+      <input type="number" id="mood-age" value="30" min="1" max="120" style="width:120px">
+    </div>
+
+    <div class="field">
+      <label>🅰️ 血型</label>
+      <div class="blood-grid">
+        <div class="blood-btn" onclick="selectBlood(this)" data-blood="A">A</div>
+        <div class="blood-btn" onclick="selectBlood(this)" data-blood="B">B</div>
+        <div class="blood-btn active" onclick="selectBlood(this)" data-blood="O">O</div>
+        <div class="blood-btn" onclick="selectBlood(this)" data-blood="AB">AB</div>
+        <div class="blood-btn" onclick="selectBlood(this)" data-blood="不知道">不知道</div>
+        <div class="blood-btn" onclick="selectBlood(this)" data-blood="其他">其他</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-primary btn-confirm" onclick="generate()">确认信息，生成幸运号</button>
+
+  <div id="lucky-box" class="result-box">
+    <div class="result-label">⭐ 您的今日幸运号</div>
+    <div id="lucky-nums" class="numbers-display"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">🎲 开奖</div>
+    <div class="type-toggle">
+      <button class="type-btn active" id="type-ssq" onclick="setType('ssq')">双色球</button>
+      <button class="type-btn" id="type-dlt" onclick="setType('dlt')">大乐透</button>
+    </div>
+  </div>
+
+  <button id="draw-btn" class="btn-primary btn-draw" onclick="draw()" disabled>开奖</button>
+
+  <div id="draw-box" class="result-box">
+    <div class="draw-result">
+      <div class="section-title">🎰 模拟开奖号码</div>
+      <div id="draw-nums" class="numbers-display" style="font-size:18px;color:#bdc3c7;"></div>
+      <div id="win-result" class="win-result" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="hint">彩票是公益事业，请理性对待。中奖纯属概率事件，无法预测。</div>
+  <div style="text-align:center;font-size:11px;color:#444;margin-top:16px;padding-bottom:20px;">
+    Made by <span style="color:#9b59b6;font-weight:bold;">luckycat</span> · <a href="mailto:luckycat168968@gmail.com" style="color:#9b59b6;">luckycat168968@gmail.com</a>
+  </div>
+</div>
+
+<script>
+// ==================== Python → JavaScript 算法 ====================
+
+const ZODIAC_SIGNS = [
+  ["白羊座",3,21,4,19],["金牛座",4,20,5,20],["双子座",5,21,6,20],
+  ["巨蟹座",6,21,7,22],["狮子座",7,23,8,22],["处女座",8,23,9,22],
+  ["天秤座",9,23,10,22],["天蝎座",10,23,11,21],["射手座",11,22,12,21],
+  ["摩羯座",12,22,1,19],["水瓶座",1,20,2,18],["双鱼座",2,19,3,20],
+];
+
+const ZODIAC_LONG = {
+  "白羊座":0,"金牛座":30,"双子座":60,"巨蟹座":90,"狮子座":120,"处女座":150,
+  "天秤座":180,"天蝎座":210,"射手座":240,"摩羯座":270,"水瓶座":300,"双鱼座":330
+};
+
+const ZODIAC_ELEM = {
+  "白羊座":"火","狮子座":"火","射手座":"火",
+  "金牛座":"土","处女座":"土","摩羯座":"土",
+  "双子座":"风","天秤座":"风","水瓶座":"风",
+  "巨蟹座":"水","天蝎座":"水","双鱼座":"水"
+};
+
+function getZodiac(day, month) {
+  for (const [name, m1, d1, m2, d2] of ZODIAC_SIGNS) {
+    if ((month === m1 && day >= d1) || (month === m2 && day <= d2)) return name;
+  }
+  return "白羊座";
+}
+
+function hash_md5(text) {
+  return parseInt(CryptoJS.MD5(text).toString(), 16) % 1e10;
+}
+
+function getMoonPhase(dateStr) {
+  const ref = new Date("2024-01-11");
+  const d = new Date(dateStr);
+  const days = Math.floor((d - ref) / 86400000);
+  return days % 29.53059;
+}
+
+function getSunLongitude(dateStr) {
+  const d = new Date(dateStr);
+  const spring = new Date(d.getFullYear(), 2, 20);
+  let days;
+  if (d < spring) {
+    const autumn = new Date(d.getFullYear() - 1, 8, 22);
+    days = Math.floor((d - autumn) / 86400000);
+  } else {
+    days = Math.floor((d - spring) / 86400000);
+  }
+  let lng = (days % 365.25) * 360 / 365.25;
+  return lng >= 0 ? lng : lng + 360;
+}
+
+function generateZodiacLucky(zodiac, dateStr, count, mn, mx) {
+  const sl = ZODIAC_LONG[zodiac];
+  const sun_lng = getSunLongitude(dateStr);
+  const d = new Date(dateStr);
+  const wd = d.getDay();
+  const PLANETS = ["月亮","火星","水星","木星","金星","土星","太阳"];
+  const PLANET_NUMS = {"太阳":1,"月亮":2,"木星":3,"土星":4,"火星":5,"金星":6,"水星":7};
+  const planet = PLANETS[wd];
+  const pnum = PLANET_NUMS[planet];
+  const moon_ph = getMoonPhase(dateStr);
+  const diff = Math.abs(sl - sun_lng) % 360;
+  const moon_idx = Math.floor(moon_ph / 29.5 * 7) + 1;
+  const elem_seed = ((zodiac + "_" + (d.getMonth() + 1)).charCodeAt(0) * 7) % 10 + 1;
+  const base = Math.floor(diff * pnum + moon_ph * moon_idx + elem_seed * 13) % 1e9;
+  const zi = Object.keys(ZODIAC_LONG).indexOf(zodiac) + 1;
+  const range = mx - mn + 1;
+  const lucky = [];
+  for (let i = 0; i < count + 5; i++) {
+    const ps = (base * (i + 1) * zi) % range;
+    const day_f = (d.getDate() * (i + 1) + d.getMonth() + 1) % range;
+    const num = mn + (ps + day_f) % range;
+    if (!lucky.includes(num) && num >= mn && num <= mx) lucky.push(num);
+    if (lucky.length >= count) break;
+  }
+  return lucky.slice(0, count);
+}
+
+function seededRandom(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+}
+
+function generateLucky(name, birth, zodiac, mood, age, blood, count, mn, mx, exclude, customSeed) {
+  const today = new Date().toISOString().slice(0, 10);
+  const seed = customSeed || hash_md5(`${name}_${birth}_${zodiac}_${mood}_${age}_${blood}_${today}`);
+  const rng = seededRandom(seed);
+  exclude = exclude || [];
+  const pool = generateZodiacLucky(zodiac, today, 5, mn, mx);
+  const zp = pool.slice(0, Math.min(3, count));
+  const rem = count - zp.length;
+  const others = [];
+  for (let i = 0; i < rem * 5; i++) {
+    const n = mn + Math.floor(rng() * (mx - mn + 1));
+    if (!zp.includes(n) && !others.includes(n) && !exclude.includes(n)) others.push(n);
+    if (others.length >= rem) break;
+  }
+  return [...zp, ...others].slice(0, count).sort((a, b) => a - b);
+}
+
+function ssqLucky(name, birth, zodiac, mood, age, blood, seed) {
+  const red = generateLucky(name, birth, zodiac, mood, age, blood, 6, 1, 33, null, seed);
+  const blue = generateLucky(name, birth, zodiac, mood, age, blood, 1, 1, 16, null, seed + 1)[0];
+  return { red, blue };
+}
+
+function dltLucky(name, birth, zodiac, mood, age, blood, seed) {
+  const today = new Date().toISOString().slice(0, 10);
+  const front = generateLucky(name, birth, zodiac, mood, age, blood, 5, 1, 35, null, seed);
+  const pool = generateZodiacLucky(zodiac, today, 5, 1, 12);
+  const back_l = pool.filter(x => !front.includes(x));
+  const seed_back = hash_md5(`${name}_back_${birth}_${zodiac}_${mood}_${age}_${blood}_${today}`);
+  const rng = seededRandom(seed_back);
+  const bl_pick = back_l.slice(0, 2);
+  const rem = 2 - bl_pick.length;
+  const others = [];
+  for (let i = 0; i < rem * 10; i++) {
+    const n = 1 + Math.floor(rng() * 12);
+    if (!front.includes(n) && !bl_pick.includes(n) && !others.includes(n)) others.push(n);
+    if (others.length >= rem) break;
+  }
+  const back = [...bl_pick, ...others].sort((a, b) => a - b).slice(0, 2);
+  return { front, back };
+}
+
+function ssqDraw(drawCount) {
+  const rng = seededRandom(20260703 * 10000 + drawCount);
+  const red = [];
+  while (red.length < 6) {
+    const n = 1 + Math.floor(rng() * 33);
+    if (!red.includes(n)) red.push(n);
+  }
+  return { red: red.sort((a, b) => a - b), blue: 1 + Math.floor(rng() * 16) };
+}
+
+function dltDraw(drawCount) {
+  const rng = seededRandom(20260704 * 10000 + drawCount);
+  const front = [];
+  while (front.length < 5) {
+    const n = 1 + Math.floor(rng() * 35);
+    if (!front.includes(n)) front.push(n);
+  }
+  const back = [];
+  while (back.length < 2) {
+    const n = 1 + Math.floor(rng() * 12);
+    if (!back.includes(n)) back.push(n);
+  }
+  return { front: front.sort((a, b) => a - b), back: back.sort((a, b) => a - b) };
+}
+
+function ssqCheck(ur, ub, wr, wb) {
+  const rh = ur.filter(x => wr.includes(x)).length;
+  const bh = ub === wb;
+  if (rh === 6 && bh) return [1, "🏆 一等奖（6红+蓝）"];
+  if (rh === 6) return [2, "🏆 二等奖（6红）"];
+  if (rh === 5 && bh) return [3, "🏆 三等奖（5红+蓝）"];
+  if (rh === 5 || (rh === 4 && bh)) return [4, "🎉 四等奖"];
+  if (rh === 4 || (rh === 3 && bh)) return [5, "👌 五等奖"];
+  if (bh) return [6, "🎯 六等奖（蓝球）"];
+  return [0, "未中奖"];
+}
+
+function dltCheck(uf, ub, wf, wb) {
+  const fh = uf.filter(x => wf.includes(x)).length;
+  const bh = ub.filter(x => wb.includes(x)).length;
+  if (fh === 5 && bh === 2) return [1, "🏆 一等奖（5+2）"];
+  if (fh === 5 && bh === 1) return [2, "🏆 二等奖（5+1）"];
+  if (fh === 5) return [3, "🏆 三等奖（5+0）"];
+  if (fh === 4 && bh === 2) return [4, "🎉 四等奖（4+2）"];
+  if (fh === 4 || (fh === 3 && bh === 2)) return [5, "👌 五等奖"];
+  if (fh === 3 || (fh === 2 && bh === 2)) return [6, "🎯 六等奖"];
+  if (bh === 2) return [7, "🎯 七等奖（2后区）"];
+  if (fh === 4 || bh === 1) return [8, "八等奖"];
+  return [0, "未中奖"];
+}
+
+// ==================== 状态 & UI ====================
+
+let state = {
+  name: '', birth: '1993-12-13', zodiac: '射手座',
+  mood: '平常心', moodAge: 30, blood: 'O', type: 'ssq', infoReady: false,
+  drawCount: 0
+};
+let luckyNums = null;
+let luckySeed = 0;
+let deferredPrompt = null;
+
+function $(id) { return document.getElementById(id); }
+
+// PWA 安装提示
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  $('install-banner').style.display = 'block';
+});
+
+function installApp() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    $('install-banner').style.display = 'none';
+    deferredPrompt = null;
+  });
+}
+
+// 注册 Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+}
+
+function selectMood(el) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  state.mood = el.dataset.mood;
+}
+
+function selectBlood(el) {
+  document.querySelectorAll('.blood-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  state.blood = el.dataset.blood;
+}
+
+function setType(t) {
+  state.type = t;
+  state.drawCount = 0;
+  document.querySelectorAll('.type-btn').forEach((b, i) => {
+    b.classList.toggle('active', (t === 'ssq' && i === 0) || (t === 'dlt' && i === 1));
+  });
+  if (state.infoReady) generate();
+}
+
+$('birth').addEventListener('change', function() {
+  const d = new Date(this.value);
+  if (!isNaN(d)) {
+    state.zodiac = getZodiac(d.getDate(), d.getMonth() + 1);
+    $('zodiac-tag').textContent = state.zodiac;
+  }
+});
+
+function fmtBall(n) { return String(n).padStart(2, '0'); }
+
+function generate() {
+  state.name = $('name').value.trim() || '匿名用户';
+  state.birth = $('birth').value;
+  state.moodAge = parseInt($('mood-age').value) || 30;
+  state.zodiac = getZodiac(new Date(state.birth).getDate(), new Date(state.birth).getMonth() + 1);
+  $('zodiac-tag').textContent = state.zodiac;
+
+  // Fix: use fixed seed based on user data, not Date.now()
+  const today = new Date().toISOString().slice(0, 10);
+  luckySeed = hash_md5(`${state.name}_${state.birth}_${state.zodiac}_${state.mood}_${state.moodAge}_${state.blood}_${today}`);
+
+  if (state.type === 'ssq') {
+    luckyNums = ssqLucky(state.name, state.birth, state.zodiac, state.mood, state.moodAge, state.blood, luckySeed);
+    const red = luckyNums.red.map(n => `<span class="draw-ball red-ball">${fmtBall(n)}</span>`).join(' ');
+    const blue = `<span class="draw-ball blue-ball">${fmtBall(luckyNums.blue)}</span>`;
+    $('lucky-nums').innerHTML = `<div class="ball-group">红球：${red}</div><div class="ball-group">蓝球：${blue}</div>`;
+  } else {
+    luckyNums = dltLucky(state.name, state.birth, state.zodiac, state.mood, state.moodAge, state.blood, luckySeed);
+    const front = luckyNums.front.map(n => `<span class="draw-ball red-ball">${fmtBall(n)}</span>`).join(' ');
+    const back = luckyNums.back.map(n => `<span class="draw-ball blue-ball">${fmtBall(n)}</span>`).join(' ');
+    $('lucky-nums').innerHTML = `<div class="ball-group">前区：${front}</div><div class="ball-group">后区：${back}</div>`;
+  }
+
+  state.infoReady = true;
+  $('lucky-box').classList.add('show');
+  $('draw-btn').disabled = false;
+  $('draw-box').classList.remove('show');
+  $('win-result').style.display = 'none';
+}
+
+function draw() {
+  if (!state.infoReady || !luckyNums) return;
+
+  const dc = state.drawCount++;
+  let drawResult, winResult;
+  if (state.type === 'ssq') {
+    const d = ssqDraw(dc);
+    drawResult = d;
+    const [rank, msg] = ssqCheck(luckyNums.red, luckyNums.blue, d.red, d.blue);
+    winResult = [rank, msg];
+  } else {
+    const d = dltDraw(dc);
+    drawResult = d;
+    const [rank, msg] = dltCheck(luckyNums.front, luckyNums.back, d.front, d.back);
+    winResult = [rank, msg];
+  }
+
+  $('draw-box').classList.add('show');
+
+  if (state.type === 'ssq') {
+    const wr = drawResult.red.map(n => `<span class="draw-ball red-ball">${fmtBall(n)}</span>`).join(' ');
+    const wb = `<span class="draw-ball blue-ball">${fmtBall(drawResult.blue)}</span>`;
+    $('draw-nums').innerHTML = `<div class="ball-group">红球：${wr}</div><div class="ball-group">蓝球：${wb}</div>`;
+  } else {
+    const wf = drawResult.front.map(n => `<span class="draw-ball red-ball">${fmtBall(n)}</span>`).join(' ');
+    const wb = drawResult.back.map(n => `<span class="draw-ball blue-ball">${fmtBall(n)}</span>`).join(' ');
+    $('draw-nums').innerHTML = `<div class="ball-group">前区：${wf}</div><div class="ball-group">后区：${wb}</div>`;
+  }
+
+  const [rank, msg] = winResult;
+  $('win-result').className = `win-result win-${rank}`;
+  $('win-result').style.display = 'block';
+  $('win-result').textContent = msg;
+}
+
+// 初始化
+$('birth').dispatchEvent(new Event('change'));
+</script>
+</body>
+</html>
